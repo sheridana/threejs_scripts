@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <title>3D Neurons test</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <link rel=stylesheet href="css/base.css"/>
+    <style>
+            .popup{
+                display: none;
+                max-width: 75%;
+                height: auto;
+                background-color: rgba(255, 255, 255, 0.49);
+                border-radius: 5px;
+                position: absolute;
+                bottom: 5%;
+                left: 10%;
+                padding: 5px 28px 5px 28px;
+                -moz-box-shadow: 3px 3px 5px 6px #ccc;
+                -webkit-box-shadow: 3px 3px 5px 6px #ccc;
+                box-shadow: 1px 3px 1px 1px rgba(0, 0, 0);
+                z-index: 1;
+            }
+            
+    </style>
+</head>
+<body>
+
+<script src="JS/three.min.js"></script>
+
+<div class="popup"><div class="text"></div></div>
+<script type"text/javascript" src="JS/jquery-3.2.1.min.js"></script>
+<script src="JS/OrbitControls.js"></script>
+<script src="JS/dat.gui.min.js"></script>
+<script src="JS/Projector.js"></script>
+<script type="module" src="JS/LoadingManager.js"></script>
+
+
+
+<!-- jQuery code to display an information button and box when clicked. -->
+
+<!-- ------------------------------------------------------------ -->
+
+<div id="ThreeJS" style="position: absolute; left:0px; top:0px"></div>
+
+<input id="myInput" type="file" style="visibility:hidden" />
+<script>
+
+THREE.Cache.enabled = true;
+// MAIN
+
+// standard global variables
+var container, scene, camera, renderer, controls, gui, folder;
+var is_loaded;
+//var sphereGeo, sphereMat;
+//var isShiftDown = false;
+
+var objects = [];
+//var materials = [];
+//var guis = [];
+//var clipPlanes = [];
+
+// var array = [];
+// array[0] = 1;
+// array[1] = 2;
+// array[2] = 3;
+
+// console.log(array);
+// console.log(array.length);
+
+var strDownloadMime = "image/octet-stream";
+
+
+
+var clock = new THREE.Clock();
+
+
+
+// custom global variables
+
+var projector, mouse = { x: 0, y: 0 };
+
+init();
+animate();
+
+var manager = new THREE.LoadingManager();
+    
+    manager.onProgress = function ( item, loaded, total){
+        $('#loader').css({width:(Math.round(loaded/toral * 100))+"%"});
+        console.log( item, loaded, total );
+    };
+
+    manager.onLoad = function() {
+        $('#loaderholder').fadeOut(function(){
+            init();
+            animate();
+        });
+        console.log("all items loaded");
+    };
+
+    manager.onError = function() {
+        console.log('there has been an error');
+    };
+
+    var loader = new THREE.JSONLoader(manager);
+//??loader.load();
+
+// FUNCTIONS        
+function init() 
+{
+    
+    // SCENE
+    scene = new THREE.Scene();
+    //scene.background = new THREE.Color( "#708090" );
+    
+    // CAMERA
+    var SCREEN_WIDTH = window.innerWidth, SCREEN_HEIGHT = window.innerHeight;
+    var VIEW_ANGLE = 75, ASPECT = SCREEN_WIDTH / SCREEN_HEIGHT, NEAR = 0.01, FAR = 1000;
+    camera = new THREE.PerspectiveCamera( VIEW_ANGLE, ASPECT, NEAR, FAR);
+    scene.add(camera);
+    camera.position.set(2.5, 8, 6.5);
+
+    //console.log(camera.position)
+    
+    camera.up.set( 0, 0, -1 );
+    
+     
+    container = document.createElement( 'div' );
+    document.body.appendChild( container );
+    var info = document.createElement( 'div' ); 
+    
+    container.appendChild( info );
+    // RENDERER
+
+    renderer = new THREE.WebGLRenderer({
+            premultipliedAlpha: false,
+            preserveDrawingBuffer: true
+        }); 
+    renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+    //renderer.sortObjects = false;
+    container = document.getElementById( 'ThreeJS' );
+    container.appendChild( renderer.domElement );
+    // EVENTS
+    
+   
+    // LIGHT
+    var ambientLight = new THREE.AmbientLight( 0xFFFFFF , .3);
+    //scene.add( ambientLight );
+
+    // var directionalLight = new THREE.DirectionalLight( 0xFFFFFF, .75);
+    // directionalLight.color.setHSL(.1, 1, .95);
+    // directionalLight.position.set(2.5, 8, 6.5);
+    // directionalLight.position.multiplyScalar(30);
+    // scene.add(directionalLight);
+    // directionalLight.rotation.x = Math.PI/2;
+    // directionalLight.castShadow = true;
+
+    // var directionalLight = new THREE.DirectionalLight( 0xFFFFFF, .75);
+    // directionalLight.color.setHSL(.1, 1, .95);
+    // directionalLight.position.set(2.5, -8, 6.5);
+    // directionalLight.position.multiplyScalar(30);
+    // directionalLight.rotation.x = Math.PI/2;
+    // scene.add(directionalLight);
+    // directionalLight.castShadow = true;
+
+    var hemisphereLight = new THREE.HemisphereLight( 0xFFFFFF, .1);
+    hemisphereLight.position.set(4, 3, 1);
+    hemisphereLight.rotation.x =  Math.PI/2;
+    scene.add(hemisphereLight);
+    //var helper = new THREE.HemisphereLightHelper( hemisphereLight, 5 );
+    //scene.add( helper );
+
+    var hemisphereLight = new THREE.HemisphereLight( 0xFFFFFF, .1);
+    hemisphereLight.position.set(0,-5,0);
+    hemisphereLight.rotation.x =  Math.PI/2;
+    //scene.add(hemisphereLight);
+
+    scene.add( new THREE.AmbientLight( 0x222222, .5 ) );
+                var directionalLight = new THREE.DirectionalLight( 0xffffff, 2 );
+                directionalLight.position.set( 2, 1.2, 10 ).normalize();
+                directionalLight.rotation.x = Math.PI/2
+                scene.add( directionalLight );
+                //var helper = new THREE.DirectionalLightHelper( directionalLight, 5 );
+                //scene.add( helper );
+                var directionalLight = new THREE.DirectionalLight( 0xffffff, 1 );
+                directionalLight.position.set( -2, 1.2, -10 ).normalize();
+                scene.add( directionalLight );
+                //var helper = new THREE.DirectionalLightHelper( directionalLight, 5 );
+                //scene.add( helper );
+
+    image_parameters =
+    {
+        saveAsImage: function() { saveAsImage() }
+    };
+
+    function saveAsImage() {
+        var imgData, imgNode;
+
+        try {
+            var strMime = "image/jpeg";
+            imgData = renderer.domElement.toDataURL(strMime);
+
+            saveFile(imgData.replace(strMime, strDownloadMime), "image.jpeg");
+
+        } catch (e) {
+            console.log(e);
+            return;
+        }
+
+    }
+
+    var saveFile = function (strData, filename) {
+        var link = document.createElement('a');
+        if (typeof link.download === 'string') {
+            document.body.appendChild(link); //Firefox requires the link to be in the body
+            link.download = filename;
+            link.href = strData;
+            link.click();
+            document.body.removeChild(link); //remove the link when done
+        } else {
+            location.replace(uri);
+        }
+    }
+
+    //console.log(objects, guis);
+    // CONTROLS
+    controls = new THREE.OrbitControls( camera, renderer.domElement );
+    controls.zoomSpeed = .5;
+    controls.target.set( 3.11726, 2.67137, 6.58039)
+    
+    // initialize object to perform world/screen calculations
+    projector = new THREE.Projector();
+    
+    // when the mouse moves, call the given function
+    document.addEventListener( 'mousedown', onDocumentMouseDown, false );
+    window.addEventListener( 'resize', onWindowResize, false );
+
+    var params = {
+        loadFile: function() {
+            document.getElementById('myInput').click();
+        }
+    };
+
+    //sphereGeo = new THREE.SphereGeometry(.1, .1, .1);
+    //sphereMat = new THREE.MeshLambertMaterial( { color: 0xff0000 } );
+
+    gui = new dat.GUI({width: 500});
+
+    gui.add(params, 'loadFile').name('Load CSV file');
+
+    gui.add(image_parameters, 'saveAsImage').name("Save Image");
+
+    folder = gui.addFolder('Test Folder')   
+    loadMeshes();
+}
+
+function loadMeshes()
+{
+    var promise_list = [];
+    var segmentation_data = [];
+    var locations = [];
+    var algorithms = [];
+    var tests = [];
+    var loader = new THREE.FileLoader();
+    loader.load(
+        // resource URL
+        'testcsv.csv',
+        // onLoad callback
+        function ( data ) {
+            var lines = data.split('\n');
+            // skip first line (start at i = 1)
+            for(var i = 1; i < lines.length;i++){
+                //code here using lines[i] which will give you each line
+                var line = lines[i].split(",");
+                // might be useful to have all the cvs data in an array of
+                // dictionarys. or maybe a dictionary of arrays?
+                var temp = {
+                    file_path: line[0],
+                    segmentation: line[1],
+                    location: Number(line[2]),
+                    mala_id: line[3],
+                    gt_id: line[4],
+                    celis_id: line[5],
+                    celis_mc_id: line[6],
+                    test: line[7]
+                };
+
+                locations.push(temp["location"]);
+                algorithms.push(temp["segmentation"]);
+                tests.push(temp["test"]);
+                segmentation_data.push(temp);
+                //console.log(temp);
+                promise_list.push(
+                    // seems to help scoping to use a helper function and to
+                    // use temp instead of segmentation_data[i];
+                    create_promise(temp)
+                );
+            }
+
+            Promise.all(promise_list).then(function(values) {
+                // console.log(values);
+                // First, create a list of folders for locations in dat_gui.
+                // Creating a set will remove duplicates, but its easier to
+                // deal with an array. So remove dupes with new Set(...), and
+                // then convert the set to an array.
+                var unique_locations = Array.from(new Set(locations));
+                var unique_algorithms = Array.from(new Set(algorithms));
+                // var unique_scaling = Array.from(new Set(tests));
+                // console.log("algorithsm: " + unique_algorithms);
+                var folders = [];
+                var algo_folders = [];
+                // var test_folders = [];
+                
+                for(var i = 0; i < unique_locations.length; i++) {
+                    folders.push(
+                        folder.addFolder("Location" + unique_locations[i])
+                    );
+                    for (var j = 0; j < unique_algorithms.length; j++) {
+                        // console.log("algo: " + unique_algorithms[j]);
+                        algo_folders.push(
+                            folders[folders.length - 1].addFolder(unique_algorithms[j])
+                        );
+                        // for (var k = 0; k < unique_scaling.length; k++){
+                        //     test_folders.push(
+                        //         algo_folders[algo_folders.length - 1].addFolder(unique_scaling[k])
+                        //     );
+                        // }
+
+                    }
+                }
+                
+                // for each example in values (should be an array of mesh
+                // objects), create a button in dat_gui.
+                //for(let i = 0; i < values.length; i++) {
+                values.forEach(function(object){
+                    // get the location of the current object and figure out
+                    // which folder it belongs to.
+                    //var object = values[i];
+                    console.log("object.location: " + object.location);
+                    folder_idx = unique_algorithms.indexOf(object.segmentation);
+                    loc_idx = unique_locations.indexOf(object.location);
+                    folder_idx = loc_idx * unique_algorithms.length + folder_idx;
+
+                    segment_folder = algo_folders[folder_idx].addFolder(
+                        object.test
+                    );
+                    // segment_folder = segment_folder.addFolder(
+                    //   object.file_path
+                    // );
+                    
+                    // console.log("segment_folder: " + segment_folder);
+
+                    parameters = {
+                        color: "#" + object.material.color.getHexString(), // color (change "#" to "0x")
+                        opacity: 1, 
+                        visible: false,
+                        transparent: true,
+                        wireframe: false,
+                        reset: function() { resetObject() }    
+                    };
+                    object.Visible =
+                        segment_folder.add(parameters, 'visible')
+                                      .name('Visible').listen();
+
+                    var visible_func = (function(value) {
+                        var self = object;
+                        //console.log("hi!");
+                        self.visible = value;
+                        //console.log(self);
+                    });
+
+                    object.Visible.onChange(visible_func);
+
+                    var Wireframe = segment_folder.add( parameters, 'wireframe' ).name('Wireframe').listen();
+                        
+                        Wireframe.onChange(function(value)
+                       {   object.material.wireframe = value;   });
+
+                    var Color = segment_folder.addColor( parameters, 'color' ).name('Color').listen();
+                   
+                        Color.onChange(function(value) // onFinishChange
+                       {   object.material.color.setHex( value.replace("#", "0x") );   });
+    
+                   var Opacity = segment_folder.add( parameters, 'opacity' ).min(0).max(1).step(0.01).name('Opacity').listen();
+                        Opacity.onChange(function(value)
+                       {   object.material.opacity = value;   });
+
+                });
+            });
+            // console.log("moo");
+        }, 
+        // onProgress callback
+        function ( xhr ) {
+        },
+        // onError callback
+        function ( err ) {
+            console.error( 'An error happened' );
+        }
+    );
+}
+
+
+function create_promise(segmentation_data) {
+    //console.log(data);
+    //var segmentation_data = data;
+
+    return new Promise(function(resolve, reject) {
+        //console.log(segmentation_data["file_path"]);
+        var mesh = new THREE.JSONLoader();
+        mesh.load(segmentation_data["file_path"], function (geometry) {
+            //console.log(segmentation_data["file_path"]);
+            var material = new THREE.MeshLambertMaterial({
+                color: Math.random() * 0xffffff,
+                opacity: 1,
+                transparent: true,
+                wireframe: false
+            });
+            var object = new THREE.Mesh( geometry, material );
+            object.rotation.x =  Math.PI/2;
+            object.visible = false;
+
+            // extra object meta data
+            object.file_path = segmentation_data["file_path"];
+            object.segmentation = segmentation_data["segmentation"];
+            object.location = segmentation_data["location"];
+            object.mala_id = segmentation_data["mala_id"];
+            object.gt_id = segmentation_data["gt_id"];
+            object.celis_id = segmentation_data["celis_id"];
+            object.celis_mc_id = segmentation_data["celis_mc_id"];
+            object.test = segmentation_data["test"];
+
+            scene.add( object );
+            resolve(object);
+        });
+    });
+}
+
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize( window.innerWidth, window.innerHeight );
+} 
+
+function onDocumentMouseDown( event ) 
+{
+    // the following line would stop any other event handler from firing
+    // (such as the mouse's TrackballControls)
+    // event.preventDefault();
+    
+    //console.log("Click.");
+    
+    // update the mouse variable
+    mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+    mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+    
+    // find intersections
+
+    // create a Ray with origin at the mouse position
+    //   and direction into the scene (camera direction)
+    var vector = new THREE.Vector3( mouse.x, mouse.y, 1 );
+    projector.unprojectVector( vector, camera );
+    var ray = new THREE.Raycaster( camera.position, vector.sub( camera.position ).normalize() );
+
+    // create an array containing all objects in the scene with which the ray intersects
+    var intersects = ray.intersectObjects( scene.children );
+                
+    // if there is one (or more) intersections
+    if ( intersects.length > 0 )
+    {   
+       
+        //console.log("Hit @ " + toString( intersects[0].point ) );
+        // change the color of the closest face.
+        //intersects[ 0 ].face.color.setRGB(0xffffff); 
+        //intersects[ 0 ].object.geometry.colorsNeedUpdate = true;
+
+        this.temp = intersects[ 0 ].face.color.getHexString();
+        this.MALA = intersects[ 0 ].object.mala_id;
+        this.GT = intersects[ 0 ].object.gt_id;
+        this.CELIS = intersects[ 0 ].object.celis_id;
+        this.CELIS_MC = intersects[ 0 ].object.celis_mc_id;
+        this.position = toString(intersects[ 0 ].point.multiplyScalar( 1000 ).round());
+        // this.sphere_position = intersects[ 0 ].point;
+
+        // var geometry = new THREE.SphereGeometry(.1,.1,.1);
+        // var material = new THREE.MeshLambertMaterial({ color: 0xffff00});
+        // var sphere = new THREE.Mesh(geometry, material);
+        // sphere.rotation.x =  Math.PI/2;
+        // //sphere.position.set(this.sphere_position);
+        // scene.add(sphere);
+
+        // console.log(sphere.position);
+        
+        
+
+        $( ".text" ).empty();
+        $('a.external').attr('target', '_blank');
+        $( ".popup" ).append( "<div class='text'><p>Color: <strong>#" + this.temp + '<br>' + "</strong> Location: <strong>" + this.position + '<br>' + "</strong> Link: <strong>" + '<a href="http://slowpoke1:32768/neuroglancer/#! ' + "{'layers':{'grayscale':{'type':'image'_'source':'dvid://http://slowpoke1:32768/341635bc8c864fa5acbaf4558122c0d5/grayscale'}_'seven_column_z_gte_5024-2017_03_30_8-400000-50th_mahotas_hist256_disc256-0.750-aggressive':{'type':'segmentation'_'source':'dvid://http://slowpoke1:32768/341635bc8c864fa5acbaf4558122c0d5/seven_column_z_gte_5024-2017_03_30_8-400000-50th_mahotas_hist256_disc256-0.750-aggressive'_'segments':['"+ this.MALA + "']}_'google__fib25_groundtruth_roi_eroded50_z5006-8000':{'type':'segmentation'_'source':'dvid://http://slowpoke1:32768/341635bc8c864fa5acbaf4558122c0d5/google__fib25_groundtruth_roi_eroded50_z5006-8000'_'segments':['"+ this.GT +"']}_'google__fib25_celis_t-61.0_best_r2':{'type':'segmentation'_'source':'dvid://http://slowpoke1:32768/341635bc8c864fa5acbaf4558122c0d5/google__fib25_celis_t-61.0_best_r2'_'segments':['"+ this.CELIS +"']}_'google__fib25_celis_flat_t-55.0_best_r2':{'type':'segmentation'_'source':'dvid://http://slowpoke1:32768/341635bc8c864fa5acbaf4558122c0d5/google__fib25_celis_flat_t-55.0_best_r2'_'segments':['"+ this.CELIS_MC +"']}}_'perspectiveOrientation':[-0.12320887297391891_0.2175416201353073_-0.00949245784431696_0.9681968092918396]_'perspectiveZoom':64_'navigation':{'pose':{'position':{'voxelSize':[8_8_8]_'voxelCoordinates':"+ this.position +"}}_'zoomFactor':4.708839757426842}}" + ' "target="_blank">Link to Neuroglancer </a>' +  "</strong></p></div>");
+        $( ".popup" ).show();
+    }
+
+        // if (isShiftDown) {
+        //     var voxel = new THREE.Mesh( sphereGeo, sphereMat );
+        //     voxel.position.copy( intersect.point ).add( intersect.face.normal );
+        //     voxel.position.divideScalar( 50 ).floor().multiplyScalar( 50 ).addScalar( 25 );
+        //     scene.add(voxel);
+        // } 
+    //else{
+      //  $( ".popup" ).hide();
+     //};
+
+};
+
+function toString(v) { return "[ " + v.x + ", " + v.y + ", " + v.z + " ]"; }
+
+function animate() 
+{
+    requestAnimationFrame( animate );
+    render();       
+    update();
+}
+
+
+function update()
+{
+    
+    controls.update();
+    
+}
+
+function render() 
+{
+    renderer.render( scene, camera );
+}
+
+
+</script>
+
+</body>
+</html>
+
+
+

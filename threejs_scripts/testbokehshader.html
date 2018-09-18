@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three.js webgl - postprocessing - depth-of-field</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				background-color: #000000;
+				margin: 0px;
+				overflow: hidden;
+				font-family:Monospace;
+				font-size:13px;
+				text-align:center;
+				font-weight: bold;
+				text-align:center;
+			}
+			a {
+				color:#0078ff;
+			}
+			#info {
+				color:#fff;
+				position: relative;
+				top: 0px;
+				width: 100em;
+				margin: 0 auto -2.1em;
+				padding: 5px;
+				z-index:100;
+			}
+		</style>
+	</head>
+<!-- TODO
+Setup Number Focus Test Plates
+Use WEBGL Depth buffer support?
+-->
+	<body>
+		<script src="JS/three.js"></script>
+		<script src="JS/BokehShader2.js"></script>
+		<script src="JS/OrbitControls.js"></script>
+		<script src="JS/Detector.js"></script>
+		<script src="JS/stats.min.js"></script>
+		<script src='JS/dat.gui.min.js'></script>
+
+		<div id="ThreeJS" style="position: absolute; left:0px; top:0px"></div>
+
+		<script>
+			if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
+			var container, stats;
+			var camera, scene, renderer,
+				material_depth;
+
+			var strDownloadMime = "image/octet-stream";
+			
+			var postprocessing = { enabled  : true };
+			
+			var shaderSettings = {
+				rings: 3,
+				samples: 4
+			};
+			
+			var singleMaterial = false;
+			var mouse = new THREE.Vector2();
+			var raycaster = new THREE.Raycaster();
+			var distance = 100;
+
+			var effectController;
+			//var planes = [];
+			//var leaves = 100;
+			
+			init();
+			animate();
+			
+			function init() {
+				
+				scene = new THREE.Scene();
+
+				//scene.background = new THREE.Color( 0xFFFFFF );
+
+				var SCREEN_WIDTH = window.innerWidth, SCREEN_HEIGHT = window.innerHeight;
+    			camera = new THREE.PerspectiveCamera( 75, window.innerWidth/window.innerHeight, .01, 1000);
+				scene.add( camera );
+				camera.position.set(2.5, 8, 6.5);
+				camera.up.set( 0, 0, -1 );
+
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+    			var info = document.createElement( 'div' ); 
+    
+    			container.appendChild( info );
+
+				renderer = new THREE.WebGLRenderer( { preserveDrawingBuffer: true } );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				//renderer.sortObjects = false;
+				container = document.getElementById( 'ThreeJS' );
+				container.appendChild( renderer.domElement );
+				material_depth = new THREE.MeshDepthMaterial();
+				//
+
+				var loader = new THREE.JSONLoader();
+				
+				loader.load( 'Neurons/mala/new_meshes/dilated/MALA_location15_dilated.json', 
+				
+				function ( geometry ) 
+				{
+					var material = new THREE.MeshLambertMaterial( 
+					{
+						color: "#2b6ac5", opacity: .5, transparent: true, wireframe: true
+					});
+					
+						var mesh = new THREE.Mesh( geometry, material );
+
+						mesh.position.set(0, 0, 0);
+						
+						mesh.rotation.x = Math.PI / 2;
+						
+						scene.add( mesh );
+				}
+				),
+				loader.load( 'Neurons/gt/new_meshes/eroded/GT_location15_eroded.json', 
+				
+				function ( geometry ) 
+				{
+					var material = new THREE.MeshLambertMaterial( 
+					{
+						color: "#ca3256", opacity: .5, transparent: true, wireframe: true
+					});
+					
+						var mesh = new THREE.Mesh( geometry, material );
+
+						mesh.position.set(0, 0, 0);
+						
+						mesh.rotation.x = Math.PI / 2;
+						
+						scene.add( mesh );
+				}
+				),
+				loader.load( 'Neurons/mala/new_meshes/dilated/MALA_location16_dilated.json', function ( geometry ) {
+					var material = new THREE.MeshLambertMaterial( {
+						color: "#25b98d", opacity: .5, transparent: true, wireframe: true
+						
+					});
+					
+						var mesh = new THREE.Mesh( geometry, material );
+
+						mesh.position.set(0, 0, 0);
+						
+						mesh.rotation.x = Math.PI / 2;
+						
+						scene.add( mesh );
+					}
+				 ),
+				loader.load( 'Neurons/gt/new_meshes/eroded/GT_location16_eroded.json', function ( geometry ) {
+					var material = new THREE.MeshLambertMaterial( {
+						color: "#2b6ac5", opacity: .5, transparent: true, wireframe: true
+						
+					});
+					
+						var mesh = new THREE.Mesh( geometry, material );
+
+						mesh.position.set(0, 0, 0);
+						
+						mesh.rotation.x = Math.PI / 2;
+						
+						scene.add( mesh );
+					}
+				 )
+				;
+				
+				controls = new THREE.OrbitControls( camera, renderer.domElement );
+				controls.zoomSpeed = .5;
+				controls.target.set = (3.11726, 2.67137, 6.58039)
+				
+				// Lights
+				scene.add( new THREE.AmbientLight( 0x222222 ) );
+				var directionalLight = new THREE.DirectionalLight( 0xffffff, 2 );
+				directionalLight.position.set( 2, 1.2, 10 ).normalize();
+				scene.add( directionalLight );
+				var directionalLight = new THREE.DirectionalLight( 0xffffff, 1 );
+				directionalLight.position.set( -2, 1.2, -10 ).normalize();
+				scene.add( directionalLight );
+				
+				initPostprocessing();
+				
+				renderer.autoClear = false;
+				renderer.domElement.style.position = 'absolute';
+				renderer.domElement.style.left = "0px";
+				
+				stats = new Stats();
+				container.appendChild( stats.dom );
+				
+
+				//MouseOver if want to hover, MouseDown if want to click
+
+				document.addEventListener( 'mousedown', onDocumentMouseDown, false );
+				
+				effectController  = {
+					enabled: false,
+					jsDepthCalculation: true,
+					shaderFocus: false,
+					fstop: 2.2,
+					maxblur: 1.0,
+					showFocus: false,
+					focalDepth: 2.8,
+					bias: 0.5,
+					fringe: 0.7,
+					focalLength: 35,
+
+				};
+				
+				var matChanger = function( ) {
+					for (var e in effectController) {
+						if (e in postprocessing.bokeh_uniforms)
+						postprocessing.bokeh_uniforms[ e ].value = effectController[ e ];
+					}
+					postprocessing.enabled = effectController.enabled;
+					postprocessing.bokeh_uniforms[ 'znear' ].value = camera.near;
+					postprocessing.bokeh_uniforms[ 'zfar' ].value = camera.far;
+					camera.setFocalLength(effectController.focalLength);
+				};
+
+				parameters =
+    				{
+        				saveAsImage: function() { saveAsImage() }
+    				};
+
+    			function saveAsImage() {
+        				var imgData, imgNode;
+
+        			try {
+            			var strMime = "image/png";
+            			imgData = renderer.domElement.toDataURL(strMime);
+
+            			saveFile(imgData.replace(strMime, strDownloadMime), "image.png");
+
+        				} catch (e) {
+            			console.log(e);
+            		return;
+        			}
+
+    				}
+
+    			var saveFile = function (strData, filename) {
+        		var link = document.createElement('a');
+        		if (typeof link.download === 'string') {
+            		document.body.appendChild(link); //Firefox requires the link to be in the body
+            		link.download = filename;
+            		link.href = strData;
+            		link.click();
+            		document.body.removeChild(link); //remove the link when done
+        		} else {
+            		location.replace(uri);
+        		}
+    			}
+				
+				var gui = new dat.GUI();
+
+				gui.add( parameters, 'saveAsImage' ).name("Save Image");
+				var post_processing = gui.addFolder('Post Processing')
+				post_processing.add( effectController, "enabled" ).onChange( matChanger );
+				post_processing.add( effectController, "jsDepthCalculation" ).onChange( matChanger );
+				post_processing.add( effectController, "shaderFocus" ).onChange( matChanger );
+				post_processing.add( effectController, "focalDepth", 0.0, 200.0 ).listen().onChange( matChanger );
+				post_processing.add( effectController, "fstop", 0.1, 22, 0.001 ).onChange( matChanger );
+				post_processing.add( effectController, "maxblur", 0.0, 5.0, 0.025 ).onChange( matChanger );
+				post_processing.add( effectController, "showFocus" ).onChange( matChanger );
+				post_processing.add( effectController, "bias", 0,3, 0.001 ).onChange( matChanger );
+				post_processing.add( effectController, "fringe", 0, 5, 0.001 ).onChange( matChanger );
+				post_processing.add( effectController, "focalLength", 0, 200, 0.001 ).onChange( matChanger );
+				post_processing.add( shaderSettings, "rings", 1, 8).step(1).onChange( shaderUpdate );
+				post_processing.add( shaderSettings, "samples", 1, 13).step(1).onChange( shaderUpdate );
+				matChanger();
+				window.addEventListener( 'resize', onWindowResize, false );
+			}
+			
+			function onWindowResize() {
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize( window.innerWidth, window.innerHeight );
+			}
+			
+			//MouseOver if want to hover, MouseDown if want to click
+			//push down and over to gui?
+			function onDocumentMouseDown( event ) {
+				mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+    			mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+				postprocessing.bokeh_uniforms[ 'focusCoords' ].value.set(event.clientX / window.innerWidth, 1-(event.clientY / window.innerHeight));
+			}
+			
+			
+			function initPostprocessing() {
+				postprocessing.scene = new THREE.Scene();
+				postprocessing.camera = new THREE.OrthographicCamera( window.innerWidth / - 2, window.innerWidth / 2,  window.innerHeight / 2, window.innerHeight / - 2, -10000, 10000 );
+				postprocessing.camera.position.z = 100;
+				postprocessing.scene.add( postprocessing.camera );
+				var pars = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBFormat };
+				postprocessing.rtTextureDepth = new THREE.WebGLRenderTarget( window.innerWidth, window.innerHeight, pars );
+				postprocessing.rtTextureColor = new THREE.WebGLRenderTarget( window.innerWidth, window.innerHeight, pars );
+				var bokeh_shader = THREE.BokehShader;
+				postprocessing.bokeh_uniforms = THREE.UniformsUtils.clone( bokeh_shader.uniforms );
+				postprocessing.bokeh_uniforms[ "tColor" ].value = postprocessing.rtTextureColor.texture;
+				postprocessing.bokeh_uniforms[ "tDepth" ].value = postprocessing.rtTextureDepth.texture;
+				postprocessing.bokeh_uniforms[ "textureWidth" ].value = window.innerWidth;
+				postprocessing.bokeh_uniforms[ "textureHeight" ].value = window.innerHeight;
+				postprocessing.materialBokeh = new THREE.ShaderMaterial( {
+					uniforms: postprocessing.bokeh_uniforms,
+					vertexShader: bokeh_shader.vertexShader,
+					fragmentShader: bokeh_shader.fragmentShader,
+					defines: {
+						RINGS: shaderSettings.rings,
+						SAMPLES: shaderSettings.samples
+					}
+				} );
+				postprocessing.quad = new THREE.Mesh( new THREE.PlaneBufferGeometry( window.innerWidth, window.innerHeight ), postprocessing.materialBokeh );
+				postprocessing.quad.position.z = - 500;
+				postprocessing.scene.add( postprocessing.quad );
+			}
+			
+			function shaderUpdate() {
+				postprocessing.materialBokeh.defines.RINGS = shaderSettings.rings;
+				postprocessing.materialBokeh.defines.SAMPLES = shaderSettings.samples;
+				postprocessing.materialBokeh.needsUpdate = true;
+			}
+			
+			function animate() {
+				requestAnimationFrame( animate, renderer.domElement );
+				render();
+				stats.update();
+			}
+			
+			function linearize(depth) {
+				var zfar = camera.far;
+				var znear = camera.near;
+				return -zfar * znear / (depth * (zfar - znear) - zfar);
+			}
+			
+			function smoothstep(near, far, depth) {
+				var x = saturate( (depth - near) / (far - near));
+				return x * x * (3- 2*x);
+			}
+			
+			function saturate(x) {
+				return Math.max(0, Math.min(1, x));
+			}
+			
+			function update()
+			{
+    
+    			controls.update();
+    
+			}
+			
+			function render() {
+				//var time = Date.now() * 0.00015;
+				//camera.position.x = Math.cos(time) * 400;
+				//camera.position.z = Math.sin(time) * 500;
+				//camera.position.y = Math.sin(time / 1.4) * 100;
+				camera.updateMatrixWorld();
+				if ( effectController.jsDepthCalculation ) {
+					raycaster.setFromCamera( mouse, camera );
+					var intersects = raycaster.intersectObjects( scene.children, true );
+					if ( intersects.length > 0 ) {
+						var targetDistance = intersects[ 0 ].distance;
+						distance += (targetDistance - distance) * 0.03;
+						var sdistance = smoothstep(camera.near, camera.far, distance);
+						var ldistance = linearize(1 -  sdistance);
+						// (Math.random() < 0.1) && console.log('moo', targetDistance, distance, ldistance);
+						postprocessing.bokeh_uniforms[ 'focalDepth' ].value = ldistance;
+						effectController['focalDepth'] = ldistance;
+					}
+				}
+				
+				if ( postprocessing.enabled ) {
+					renderer.clear();
+					// Render scene into texture
+					scene.overrideMaterial = null;
+					renderer.render( scene, camera, postprocessing.rtTextureColor, true );
+					// Render depth into texture
+					scene.overrideMaterial = material_depth;
+					renderer.render( scene, camera, postprocessing.rtTextureDepth, true );
+					// Render bokeh composite
+					renderer.render( postprocessing.scene, postprocessing.camera );
+				} else {
+					scene.overrideMaterial = null;
+					renderer.clear();
+					renderer.render( scene, camera );
+				}
+			}
+		</script>
+	</body>
+</html>
